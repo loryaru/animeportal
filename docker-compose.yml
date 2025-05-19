@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # Фронтенд (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: anime-frontend
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:5001/api
+    depends_on:
+      - backend
+    networks:
+      - anime-network
+
+  # Бэкенд (Express.js)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: anime-backend
+    restart: unless-stopped
+    volumes:
+      - ./backend/index.js:/app/index.js
+    ports:
+      - "5001:5001"
+    environment:
+      - NODE_ENV=development
+      - PORT=5001
+    depends_on:
+      - postgres
+    networks:
+      - anime-network
+
+  # PostgreSQL
+  postgres:
+    image: postgres:14-alpine
+    container_name: anime-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=anime_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - anime-network
+
+  # Nginx для проксирования запросов
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: anime-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - anime-network
+
+volumes:
+  postgres-data:
+
+networks:
+  anime-network:
+    driver: bridge
